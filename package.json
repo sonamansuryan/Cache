@@ -9,7 +9,8 @@
     "db:migrate": "sequelize-cli db:migrate",
     "db:seed": "node ./scripts/seed.js",
     "db:reset": "sequelize-cli db:migrate:undo:all && sequelize-cli db:migrate && node ./scripts/seed.js",
-    "reprice": "node ./scripts/reprice.js"
+    "reprice": "node ./scripts/reprice.js",
+    "test": "node --test --test-concurrency=1 'test/**/*.test.js'"
   },
   "dependencies": {
     "dotenv": "^18.0.9",

@@ -1,5 +1,7 @@
 require('dotenv').config({ quiet: true });
 const { Product, sequelize } = require('../src/models');
+const redis = require('../src/cache/redis');
+const { invalidateProduct } = require('../src/cache');
 
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
@@ -16,9 +18,16 @@ async function main() {
   } else {
     const [updated] = await Product.update({ price }, { where: { id } });
     console.log(updated ? `product ${id}: price set to ${price.toFixed(2)}` : `product ${id} not found`);
+    if (updated) {
+      // The API caches responses in Redis: drop the ones that still show the old price.
+      const product = await Product.findByPk(id, { attributes: ['id', 'category'] });
+      await redis.connect();
+      await invalidateProduct(product);
+    }
   }
 
   await sequelize.close();
+  if (redis.isOpen) await redis.close();
 }
 
 main().catch((err) => {

@@ -1,5 +1,6 @@
 const { Product } = require('../models');
 const { NotFoundError } = require('../utils/errors');
+const cache = require('../cache');
 
 const ORDER = {
   newest: [['createdAt', 'DESC'], ['id', 'DESC']],
@@ -29,6 +30,7 @@ async function getProduct(id) {
 async function updateProduct(id, fields) {
   const product = await getProduct(id);
   await product.update(fields);
+  await cache.invalidateProduct(product);
   return product;
 }
 

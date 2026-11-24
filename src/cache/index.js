@@ -26,4 +26,14 @@ async function listResponse(query, load) {
 
 const productResponse = (id, load) => readThrough(productKey(id), load, PRODUCT_TTL_SECONDS);
 
-module.exports = { listResponse, productResponse };
+// After a product changed in MySQL: delete its cached entry, and move the two list
+// scopes that can show it (its category, and the unfiltered lists) to a new version.
+// Their old pages are never read again and expire through their TTL.
+async function invalidateProduct({ id, category }) {
+  const scopes = new Set([listScope(category), listScope()]);
+  const tx = redis.multi().del(productKey(id));
+  for (const scope of scopes) tx.incr(listVersionKey(scope));
+  await tx.exec();
+}
+
+module.exports = { listResponse, productResponse, invalidateProduct };

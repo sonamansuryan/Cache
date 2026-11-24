@@ -1,6 +1,9 @@
 // Starts the real API (src/index.js) in a child process for the tests: on a free
 // port (PORT), against the MySQL configured in .env (the docker-compose service
 // with its seeded data), and with SQL_LOG=1 so every query it runs is logged.
+// Extra environment variables, such as another REDIS_PORT, can be passed in `env`.
+// By default it also waits until the API is connected to Redis, so the first request
+// can use the cache. Pass `redis: false` when Redis is meant to be unreachable.
 const { spawn } = require('node:child_process');
 const net = require('node:net');
 const path = require('node:path');
@@ -20,11 +23,11 @@ function freePort() {
   });
 }
 
-async function startApi() {
+async function startApi({ env = {}, redis = true } = {}) {
   const port = await freePort();
   const child = spawn(process.execPath, ['src/index.js'], {
     cwd: ROOT,
-    env: { ...process.env, PORT: String(port), SQL_LOG: '1' },
+    env: { ...process.env, ...env, PORT: String(port), SQL_LOG: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const killChild = () => child.kill();
@@ -71,6 +74,7 @@ async function startApi() {
   }
 
   await waitForLine(/^catalog-api listening on /, 0, 'the API to start', 15000);
+  if (redis) await waitForLine(/^Connected to Redis at /, 0, 'the API to connect to Redis', 15000);
   const baseUrl = `http://localhost:${port}`;
 
   async function send(method, urlPath, body) {
@@ -118,4 +122,4 @@ async function startApi() {
   return { port, baseUrl, request, stop };
 }
 
-module.exports = { startApi };
+module.exports = { startApi, freePort };

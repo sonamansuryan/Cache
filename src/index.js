@@ -1,6 +1,7 @@
 require('dotenv').config({ quiet: true });
 const express = require('express');
 const { sequelize } = require('./models');
+const redis = require('./cache/redis');
 const router = require('./router');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 
@@ -17,6 +18,9 @@ app.use(notFound);
 app.use(errorHandler);
 
 const port = Number(process.env.PORT) || 4000;
+
+// Redis connects in the background and reconnects on its own; the API does not wait for it.
+redis.connect().catch((err) => console.error('Could not connect to Redis:', err.message));
 
 sequelize
   .authenticate()

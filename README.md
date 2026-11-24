@@ -135,7 +135,7 @@ How we work:
 
 The steps under [Run it](#run-it) are unchanged. `docker compose up -d` starts MySQL and Redis, and `npm start` connects to both. The API doesn't wait for Redis: it starts without it, and connects or reconnects on its own. There is one new variable, `REDIS_HOST`, and `REDIS_PORT` is now also used by the API (see [Environment variables](#environment-variables)).
 
-`npm test` runs 16 tests in under 10 s (Node.js 22+).
+`npm test` runs 19 tests in under 10 s (Node.js 22+).
 - They need the Docker Compose MySQL and Redis running and the seeded data. They start their own API instances.
 - They change a few products in the `catalog` database and write the exact values back afterwards.
 - They delete the API's cache keys (`catalog:*`) before each test and at the end.

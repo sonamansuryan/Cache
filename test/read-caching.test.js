@@ -1,7 +1,8 @@
 // The read endpoints are cached. A first request is a miss: it queries MySQL and
 // stores the response in Redis. An identical second request is a hit: it returns
-// the same body without sending any SQL. Cached responses match the uncached ones,
-// and different parameters never share an entry.
+// the same body without sending any SQL. Cached responses match the uncached ones.
+// Different parameters never share an entry, while equivalent requests (a category's
+// letter case, omitted vs explicit defaults, an id's leading zeros) do.
 const { test, before, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { startApi } = require('./helpers/api');
@@ -97,6 +98,38 @@ test('GET /api/products: cached pages match the uncached MySQL pages, and no two
 
 test('GET /api/products/:id: cached products match the uncached MySQL products, and no two ids share an entry', async () => {
   await checkAgainstUncached(PRODUCT_URLS, 1);
+});
+
+// The first URL is a miss and stores `key`. The equivalent URL must be answered from
+// that same entry: no SQL, the same body, and still only one entry in Redis.
+async function checkSharedEntry(url, equivalentUrl, key, sqlPerMiss) {
+  const first = await api.request('GET', url);
+  assert.equal(first.status, 200, url);
+  assert.equal(first.sql.length, sqlPerMiss, `${url}: with an empty cache it must read MySQL`);
+  assert.deepEqual(await cache.keys(), [key]);
+
+  const equivalent = await api.request('GET', equivalentUrl);
+  assert.equal(equivalent.status, 200, equivalentUrl);
+  assert.deepEqual(equivalent.sql, [], `${equivalentUrl}: must be served from the entry stored for ${url}`);
+  assert.deepEqual(equivalent.body, first.body, equivalentUrl);
+  assert.deepEqual(await cache.keys(), [key], 'still one entry');
+}
+
+test('GET /api/products: a category that differs only in letter case shares the same entry', async () => {
+  await checkSharedEntry(
+    README_PAGE,
+    '/api/products?category=Toys&sort=price_asc&page=2&limit=2',
+    'catalog:list:cat:toys:v0:price_asc:2:2',
+    2,
+  );
+});
+
+test('GET /api/products: omitted and explicit default parameters share the same entry', async () => {
+  await checkSharedEntry('/api/products', '/api/products?sort=newest&page=1&limit=20', 'catalog:list:all:v0:newest:1:20', 2);
+});
+
+test('GET /api/products/:id: an id with leading zeros shares the entry of the plain id', async () => {
+  await checkSharedEntry('/api/products/123', '/api/products/0123', 'catalog:product:123', 1);
 });
 
 test('GET /api/products/:id: a miss queries MySQL and stores the product; a hit comes from Redis', async () => {

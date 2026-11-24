@@ -114,3 +114,23 @@ test('GET /api/products/:id: a miss queries MySQL and stores the product; a hit 
   assert.deepEqual(hit.sql, []);
   assert.deepEqual(hit.body, miss.body);
 });
+
+test('cached entries expire: list pages after 60 s, products after 300 s, and a hit does not extend them', async () => {
+  const listKey = 'catalog:list:cat:toys:v0:price_asc:2:2';
+  const productKey = 'catalog:product:123';
+
+  await api.request('GET', README_PAGE);
+  await api.request('GET', '/api/products/123');
+  const listTtl = await cache.ttl(listKey);
+  const productTtl = await cache.ttl(productKey);
+  assert.ok(listTtl >= 55 && listTtl <= 60, `list page TTL is ${listTtl} s`);
+  assert.ok(productTtl >= 295 && productTtl <= 300, `product TTL is ${productTtl} s`);
+
+  // The countdown starts when the data is read from MySQL; a hit must not restart it.
+  const listMsBefore = await cache.pttl(listKey);
+  const productMsBefore = await cache.pttl(productKey);
+  assert.deepEqual((await api.request('GET', README_PAGE)).sql, []);
+  assert.deepEqual((await api.request('GET', '/api/products/123')).sql, []);
+  assert.ok((await cache.pttl(listKey)) < listMsBefore, 'a list hit must not extend its TTL');
+  assert.ok((await cache.pttl(productKey)) < productMsBefore, 'a product hit must not extend its TTL');
+});

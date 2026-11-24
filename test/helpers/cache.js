@@ -33,6 +33,18 @@ async function get(key) {
   return client.get(key);
 }
 
+// Time until `key` expires: TTL in seconds, PTTL in milliseconds.
+// -1 means the key has no expiry; -2 means there is no such key.
+async function ttl(key) {
+  await connected();
+  return client.ttl(key);
+}
+
+async function pttl(key) {
+  await connected();
+  return client.pTTL(key);
+}
+
 // Removes every cache key the app has stored, and nothing else in Redis.
 async function clear() {
   const found = await keys();
@@ -43,4 +55,4 @@ async function close() {
   if (client.isOpen) await client.close();
 }
 
-module.exports = { keys, get, clear, close };
+module.exports = { keys, get, ttl, pttl, clear, close };
